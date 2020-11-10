@@ -1,0 +1,113 @@
+\makeatletter
+\newif\if@pgf@folder@debug
+\@pgf@folder@debugtrue
+\@pgf@folder@debugfalse
+\def\folder@debug@message#1{\if@pgf@folder@debug
+\typeout{#1}%
+\fi
+}%
+\def\pgf@folder@add@entry#1#2{% add #1 to #2
+\folder@debug@message{master=#2}%
+\edef\pgf@folder@tmpm{#2}%
+\ifcsname pgf@folder@entries@#2\endcsname
+  \folder@debug@message{before in}%
+  \edef\pgf@folder@tmpb{\csname pgf@folder@entries@#2\endcsname}%
+  \folder@debug@message{b=\pgf@folder@tmpb}%
+  \edef\pgf@folder@tmpa{\noexpand\pgfutil@in@{,#1,}{,\pgf@folder@tmpb,}}% test if #1 is in #2
+  \pgf@folder@tmpa
+  \ifpgfutil@in@%
+    \folder@debug@message{#1 already exists in list #2=\csname pgf@folder@entries@#2\endcsname.}%
+	% the key is already in, so nothing to do
+  \else
+	\folder@debug@message{adding #1 to list #2.}%
+	\expandafter\edef\csname pgf@folder@entries@#2\endcsname{\csname pgf@folder@entries@#2\endcsname,#1}%
+  \fi
+\else
+ 	\folder@debug@message{creating list #2 and adding #1.}%
+ 	\expandafter\edef\csname pgf@folder@entries@#2\endcsname{#1}%
+\fi
+}%
+
+% this is \pgfutil@for, just that the role of commas is taken by slashs
+\long\def\pgfutil@for@path#1:=#2\do#3{%
+\expandafter\def\expandafter\pgfutil@fortmp\expandafter{#2}%
+\ifx\pgfutil@fortmp\pgfutil@empty
+\else 
+\expandafter\pgfutil@forloop@path#2/\pgfutil@nil/\pgfutil@nil\@@#1{#3}%
+\fi
+}
+% called by \pgfutil@for@path
+\long\def\pgfutil@forloop@path#1/#2/#3\@@#4#5{%
+\def#4{#1}%
+\ifx#4\pgfutil@nnil 
+\else
+#5%
+\def#4{#2}%
+\ifx#4\pgfutil@nnil 
+\else 
+#5%
+\pgfutil@iforloop@path#3\@@#4{#5}%
+\fi 
+\fi
+}%
+% called by \pgfutil@forloop@path
+\long\def\pgfutil@iforloop@path#1/#2\@@#3#4{%
+\def#3{#1}%
+\ifx#3\pgfutil@nnil 
+\expandafter\pgfutil@fornoop 
+\else 
+#4\relax 
+\expandafter\pgfutil@iforloop@path\fi#2\@@#3{#4}%
+}
+% pathology: disect paths
+\def\pgfkeys@folders@split@path#1{%
+\c@pgf@counta0\relax
+\expandafter\edef\csname pgf@folder@current@folder@0\endcsname{}%
+\pgfutil@for@path\pgfkeys@temp:=#1\do{%
+\ifx\pgfkeys@temp\pgfkeys@empty
+\folder@debug@message{empty}%
+\else% to do: maybe add subfolders here?
+\advance\c@pgf@counta by1\relax
+\expandafter\edef\csname pgf@folder@current@folder@\the\c@pgf@counta\endcsname{%
+\csname pgf@folder@current@folder@\the\numexpr\c@pgf@counta-1\endcsname/%
+\pgfkeys@temp}%
+\folder@debug@message{found \pgfkeys@temp}%
+\edef\pgfkeys@folder@current@key{\pgfkeys@temp}%
+\edef\pgfkeys@folder@current@master{\csname pgf@folder@current@folder@\the\numexpr\c@pgf@counta-1\endcsname/}%
+\pgf@folder@add@entry\pgfkeys@temp\pgfkeys@folder@current@master%
+\fi
+\edef\pgfkeys@folder@current@master{\csname pgf@folder@current@folder@\the\numexpr\c@pgf@counta-1\endcsname/}%
+}}
+% tracker
+\def\pgf@folder@tracker{%
+\folder@debug@message{======================}%
+\folder@debug@message{Oh, a family.}%
+\folder@debug@message{complete path=\pgfkeyscurrentpath|name=\pgfkeyscurrentname|
+	default:\pgfkeysdefaultpath|current key=\pgfkeyscurrentkey}%
+\expandafter\pgfkeys@folders@split@path\expandafter{\pgfkeyscurrentpath}%
+\ifx\pgfkeys@folder@current@master\pgfutil@empty
+\folder@debug@message{master empty}%
+\edef\pgfkeys@folder@current@master{/}%
+\else
+\folder@debug@message{master=\pgfkeys@folder@current@master, current key=\pgfkeys@folder@current@key}%
+\fi
+%\pgf@folder@add@entry\pgfkeys@folder@current@key\pgfkeys@folder@current@master%
+}%
+
+\newcommand\FolderForestContent[2][]{\expandafter\pgf@folder@forest\expandafter{#2}}%
+\long\def\pgf@folder@forest#1{\edef\ForestContent{[#1}%
+\expandafter\pgf@folder@forest@i\expandafter{#1}%
+\edef\ForestContent{\ForestContent]}}%
+\long\def\pgf@folder@forest@i#1{\ifcsname pgf@folder@entries@#1\endcsname
+\expandafter\pgfutil@for\expandafter\pgf@folder@tmpa\expandafter:\expandafter=\csname pgf@folder@entries@#1\endcsname\do{%
+\folder@debug@message{item=\pgf@folder@tmpa}%
+\edef\ForestContent{\ForestContent[\pgf@folder@tmpa}
+\begingroup
+\edef\pgf@folder@tmpb{\pgf@folder@tmpa}%
+\expandafter\pgf@folder@forest@i\expandafter{#1\pgf@folder@tmpb/}%
+\pgfmath@smuggleone\ForestContent\endgroup%
+\edef\ForestContent{\ForestContent]}}%
+\fi}%
+\pgfkeys{install tracking for/.code={\pgfkeys{/handlers/#1/.append code={\pgf@folder@tracker}}}}
+\makeatother
+\endinput
